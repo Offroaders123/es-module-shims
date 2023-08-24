@@ -36,7 +36,7 @@ import {
   supportsJsonAssertions,
   featureDetectionPromise,
 } from './features.js';
-import * as lexer from '../node_modules/es-module-lexer/dist/lexer.asm.js';
+import * as lexer from 'es-module-lexer';
 
 async function _resolve (id, parentUrl) {
   const urlResolved = resolveIfNotPlainOrUrl(id, parentUrl);
@@ -117,7 +117,7 @@ async function loadAll (load, seen) {
     load.n = load.d.some(dep => dep.n);
 }
 
-let importMap = { imports: {}, scopes: {} };
+let importMap: ImportMap = { imports: {}, scopes: {} };
 let baselinePassthrough;
 
 const initPromise = featureDetectionPromise.then(() => {

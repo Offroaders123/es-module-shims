@@ -3,12 +3,12 @@ export const hasDocument = typeof document !== 'undefined';
 
 export const noop = () => {};
 
-const optionsScript = hasDocument ? document.querySelector('script[type=esms-options]') : undefined;
+const optionsScript: HTMLScriptElement | null = hasDocument ? document.querySelector<HTMLScriptElement>('script[type=esms-options]') : null;
 
-export const esmsInitOptions = optionsScript ? JSON.parse(optionsScript.innerHTML) : {};
+export const esmsInitOptions: ESMSInitOptions = optionsScript ? JSON.parse(optionsScript.innerHTML) : {};
 Object.assign(esmsInitOptions, self.esmsInitOptions || {});
 
-export let shimMode = hasDocument ? !!esmsInitOptions.shimMode : true;
+export let shimMode: boolean = hasDocument ? !!esmsInitOptions.shimMode : true;
 
 export const importHook = globalHook(shimMode && esmsInitOptions.onimport);
 export const resolveHook = globalHook(shimMode && esmsInitOptions.resolve);
@@ -19,9 +19,9 @@ export const mapOverrides = esmsInitOptions.mapOverrides;
 
 export let nonce = esmsInitOptions.nonce;
 if (!nonce && hasDocument) {
-  const nonceElement = document.querySelector('script[nonce]');
+  const nonceElement = document.querySelector<HTMLScriptElement>('script[nonce]');
   if (nonceElement)
-    nonce = nonceElement.nonce || nonceElement.getAttribute('nonce');
+    nonce = Boolean(nonceElement.nonce || nonceElement.getAttribute('nonce'));
 }
 
 export const onerror = globalHook(esmsInitOptions.onerror || noop);
@@ -31,13 +31,19 @@ export const onpolyfill = esmsInitOptions.onpolyfill ? globalHook(esmsInitOption
 
 export const { revokeBlobURLs, noLoadEventRetriggers, enforceIntegrity } = esmsInitOptions;
 
-function globalHook (name) {
+function globalHook<T extends ((e: any) => any)> (name: T | keyof typeof globalThis): T {
   return typeof name === 'string' ? self[name] : name;
 }
 
 const enable = Array.isArray(esmsInitOptions.polyfillEnable) ? esmsInitOptions.polyfillEnable : [];
 export const cssModulesEnabled = enable.includes('css-modules');
 export const jsonModulesEnabled = enable.includes('json-modules');
+
+declare global {
+  interface Navigator {
+    userAgentData?: object;
+  }
+}
 
 export const edge = !navigator.userAgentData && !!navigator.userAgent.match(/Edge\/\d+\.\d+/);
 
@@ -47,7 +53,7 @@ export const baseUrl = hasDocument
     ? location.pathname.slice(0, location.pathname.lastIndexOf('/') + 1) 
     : location.pathname}`;
 
-export const createBlob = (source, type = 'text/javascript') => URL.createObjectURL(new Blob([source], { type }));
+export const createBlob = (source: BlobPart, type = 'text/javascript') => URL.createObjectURL(new Blob([source], { type }));
 export let { skip } = esmsInitOptions;
 if (Array.isArray(skip)) {
   const l = skip.map(s => new URL(s, baseUrl).href);
@@ -74,12 +80,12 @@ export function setImportMapSrcOrLazy () {
 
 // shim mode is determined on initialization, no late shim mode
 if (!shimMode) {
-  if (document.querySelectorAll('script[type=module-shim],script[type=importmap-shim],link[rel=modulepreload-shim]').length) {
+  if (document.querySelectorAll<HTMLLinkElement | HTMLScriptElement>('script[type=module-shim],script[type=importmap-shim],link[rel=modulepreload-shim]').length) {
     shimMode = true;
   }
   else {
     let seenScript = false;
-    for (const script of document.querySelectorAll('script[type=module],script[type=importmap]')) {
+    for (const script of document.querySelectorAll<HTMLScriptElement>('script[type=module],script[type=importmap]')) {
       if (!seenScript) {
         if (script.type === 'module' && !script.ep)
           seenScript = true;

@@ -2,14 +2,14 @@ import { createBlob, baseUrl, nonce, hasDocument } from './env.js';
 
 export let dynamicImport = !hasDocument && (0, eval)('u=>import(u)');
 
-export let supportsDynamicImport;
+export let supportsDynamicImport: boolean;
 
 export const dynamicImportCheck = hasDocument && new Promise(resolve => {
   const s = Object.assign(document.createElement('script'), {
     src: createBlob('self._d=u=>import(u)'),
     ep: true
   });
-  s.setAttribute('nonce', nonce);
+  s.setAttribute('nonce', `${nonce}`);
   s.addEventListener('load', () => {
     if (!(supportsDynamicImport = !!(dynamicImport = self._d))) {
       let err;
