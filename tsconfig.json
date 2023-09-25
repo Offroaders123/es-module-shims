@@ -2,10 +2,12 @@
   "compilerOptions": {
     "allowJs": true,
     "checkJs": true,
-    "module": "ESNext",
-    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
     "target": "ESNext",
     "noEmit": true,
     "strict": true
-  }
+  },
+  "exclude": [
+    "./test"
+  ]
 }

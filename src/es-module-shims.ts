@@ -79,15 +79,15 @@ async function importShim (id, ...args) {
 
 self.importShim = importShim;
 
-function defaultResolve (id, parentUrl) {
+function defaultResolve (id: string, parentUrl: string) {
   return resolveImportMap(importMap, resolveIfNotPlainOrUrl(id, parentUrl) || id, parentUrl) || throwUnresolved(id, parentUrl);
 }
 
-function throwUnresolved (id, parentUrl) {
+function throwUnresolved (id: string, parentUrl: string) {
   throw Error(`Unable to resolve specifier '${id}'${fromParent(parentUrl)}`);
 }
 
-const resolveSync = (id, parentUrl = pageBaseUrl) => {
+const resolveSync = (id: string, parentUrl: string = pageBaseUrl) => {
   parentUrl = `${parentUrl}`;
   const result = resolveHook && resolveHook(id, parentUrl, defaultResolve);
   return result && !result.then ? result : defaultResolve(id, parentUrl);

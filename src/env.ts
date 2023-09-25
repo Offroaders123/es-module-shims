@@ -31,7 +31,7 @@ export const onpolyfill = esmsInitOptions.onpolyfill ? globalHook(esmsInitOption
 
 export const { revokeBlobURLs, noLoadEventRetriggers, enforceIntegrity } = esmsInitOptions;
 
-function globalHook<T extends ((e: any) => any)> (name: T | keyof typeof globalThis): T {
+function globalHook (name) {
   return typeof name === 'string' ? self[name] : name;
 }
 
@@ -57,18 +57,22 @@ export const createBlob = (source: BlobPart, type = 'text/javascript') => URL.cr
 export let { skip } = esmsInitOptions;
 if (Array.isArray(skip)) {
   const l = skip.map(s => new URL(s, baseUrl).href);
-  skip = s => l.some(i => i[i.length - 1] === '/' && s.startsWith(i) || s === i);
+  skip = ((s: string) => l.some(i => i[i.length - 1] === '/' && s.startsWith(i) || s === i)) as unknown as RegExp;
 }
 else if (typeof skip === 'string') {
   const r = new RegExp(skip);
-  skip = s => r.test(s);
+  skip = ((s: string) => r.test(s)) as unknown as RegExp;
 }
 
-const eoop = err => setTimeout(() => { throw err });
+const eoop = (err: Error) => setTimeout(() => { throw err });
 
-export const throwError = err => { (self.reportError || hasWindow && window.safari && console.error || eoop)(err), void onerror(err) };
+declare global {
+  var safari: unknown;
+}
 
-export function fromParent (parent) {
+export const throwError = (err: Error) => { (self.reportError || hasWindow && window.safari && console.error || eoop)(err), void onerror(err) };
+
+export function fromParent (parent: string) {
   return parent ? ` imported from ${parent}` : '';
 }
 
