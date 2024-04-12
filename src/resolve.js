@@ -1,10 +1,10 @@
 import { mapOverrides, shimMode } from './env.js';
 
-export let importMap: ImportMap = { imports: Object.create(null), scopes: Object.create(null) };
+export let importMap = { imports: Object.create(null), scopes: Object.create(null) };
 
 const backslashRegEx = /\\/g;
 
-export function isURL (url: string): boolean {
+export function isURL (url) {
   if (url.indexOf(':') === -1) return false;
   try {
     new URL(url);
@@ -15,11 +15,11 @@ export function isURL (url: string): boolean {
   }
 }
 
-export function resolveUrl (relUrl: string, parentUrl: string): string {
+export function resolveUrl (relUrl, parentUrl) {
   return resolveIfNotPlainOrUrl(relUrl, parentUrl) || (isURL(relUrl) ? relUrl : resolveIfNotPlainOrUrl('./' + relUrl, parentUrl));
 }
 
-export function resolveIfNotPlainOrUrl (relUrl: string, parentUrl: string): string {
+export function resolveIfNotPlainOrUrl (relUrl, parentUrl) {
   const hIdx = parentUrl.indexOf('#'), qIdx = parentUrl.indexOf('?');
   if (hIdx + qIdx > -2)
     parentUrl = parentUrl.slice(0, hIdx === -1 ? qIdx : qIdx === -1 || qIdx > hIdx ? hIdx : qIdx);
@@ -39,7 +39,7 @@ export function resolveIfNotPlainOrUrl (relUrl: string, parentUrl: string): stri
     //  throw new Error('Cannot resolve');
     // read pathname from parent URL
     // pathname taken to be part after leading "/"
-    let pathname: string;
+    let pathname;
     if (parentUrl[parentProtocol.length + 1] === '/') {
       // resolving to a :// so we need to read out the auth and host
       if (parentProtocol !== 'file:') {
@@ -52,7 +52,7 @@ export function resolveIfNotPlainOrUrl (relUrl: string, parentUrl: string): stri
     }
     else {
       // resolving to :/ so pathname is the /... part
-      pathname = parentUrl.slice(parentProtocol.length + +(parentUrl[parentProtocol.length] === '/'));
+      pathname = parentUrl.slice(parentProtocol.length + (parentUrl[parentProtocol.length] === '/'));
     }
 
     if (relUrl[0] === '/')
@@ -97,15 +97,13 @@ export function resolveIfNotPlainOrUrl (relUrl: string, parentUrl: string): stri
       output.push(segmented.slice(segmentIndex));
     return parentUrl.slice(0, parentUrl.length - pathname.length) + output.join('');
   }
-
-  throw "Probably won't reach here? Please check the source above, does it return from all checks?";
 }
 
-export function resolveAndComposeImportMap (json: ImportMap, baseUrl: string, parentMap: ImportMap): ImportMap {
+export function resolveAndComposeImportMap (json, baseUrl, parentMap) {
   const outMap = { imports: Object.assign({}, parentMap.imports), scopes: Object.assign({}, parentMap.scopes) };
 
   if (json.imports)
-    resolveAndComposePackages(json.imports, outMap.imports, baseUrl, parentMap);
+    resolveAndComposePackages(json.imports, outMap.imports, baseUrl, parentMap, null);
 
   if (json.scopes)
     for (let s in json.scopes) {
@@ -116,7 +114,7 @@ export function resolveAndComposeImportMap (json: ImportMap, baseUrl: string, pa
   return outMap;
 }
 
-function getMatch (path: string, matchObj: ImportMap["imports"] | ImportMap["scopes"]): string | undefined {
+function getMatch (path, matchObj) {
   if (matchObj[path])
     return path;
   let sepIndex = path.length;
@@ -127,7 +125,7 @@ function getMatch (path: string, matchObj: ImportMap["imports"] | ImportMap["sco
   } while ((sepIndex = path.lastIndexOf('/', sepIndex - 1)) !== -1)
 }
 
-function applyPackages (id: string, packages: ImportMap["imports"]): string | undefined {
+function applyPackages (id, packages) {
   const pkgName = getMatch(id, packages);
   if (pkgName) {
     const pkg = packages[pkgName];
@@ -137,7 +135,7 @@ function applyPackages (id: string, packages: ImportMap["imports"]): string | un
 }
 
 
-export function resolveImportMap (importMap: ImportMap, resolvedOrPlain: string, parentUrl: string): string | false {
+export function resolveImportMap (importMap, resolvedOrPlain, parentUrl) {
   let scopeUrl = parentUrl && getMatch(parentUrl, importMap.scopes);
   while (scopeUrl) {
     const packageResolution = applyPackages(resolvedOrPlain, importMap.scopes[scopeUrl]);
@@ -148,7 +146,7 @@ export function resolveImportMap (importMap: ImportMap, resolvedOrPlain: string,
   return applyPackages(resolvedOrPlain, importMap.imports) || resolvedOrPlain.indexOf(':') !== -1 && resolvedOrPlain;
 }
 
-function resolveAndComposePackages (packages: ImportMap["imports"], outPackages: ImportMap["imports"], baseUrl: string, parentMap: ImportMap): void {
+function resolveAndComposePackages (packages, outPackages, baseUrl, parentMap) {
   for (let p in packages) {
     const resolvedLhs = resolveIfNotPlainOrUrl(p, baseUrl) || p;
     if ((!shimMode || !mapOverrides) && outPackages[resolvedLhs] && (outPackages[resolvedLhs] !== packages[resolvedLhs])) {

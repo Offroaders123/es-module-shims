@@ -3,12 +3,12 @@ export const hasDocument = typeof document !== 'undefined';
 
 export const noop = () => {};
 
-const optionsScript: HTMLScriptElement | null = hasDocument ? document.querySelector<HTMLScriptElement>('script[type=esms-options]') : null;
+const optionsScript = hasDocument ? document.querySelector('script[type=esms-options]') : undefined;
 
-export const esmsInitOptions: ESMSInitOptions = optionsScript ? JSON.parse(optionsScript.innerHTML) : {};
+export const esmsInitOptions = optionsScript ? JSON.parse(optionsScript.innerHTML) : {};
 Object.assign(esmsInitOptions, self.esmsInitOptions || {});
 
-export let shimMode: boolean = hasDocument ? !!esmsInitOptions.shimMode : true;
+export let shimMode = hasDocument ? !!esmsInitOptions.shimMode : true;
 
 export const importHook = globalHook(shimMode && esmsInitOptions.onimport);
 export const resolveHook = globalHook(shimMode && esmsInitOptions.resolve);
@@ -19,9 +19,9 @@ export const mapOverrides = esmsInitOptions.mapOverrides;
 
 export let nonce = esmsInitOptions.nonce;
 if (!nonce && hasDocument) {
-  const nonceElement = document.querySelector<HTMLScriptElement>('script[nonce]');
+  const nonceElement = document.querySelector('script[nonce]');
   if (nonceElement)
-    nonce = Boolean(nonceElement.nonce || nonceElement.getAttribute('nonce'));
+    nonce = nonceElement.nonce || nonceElement.getAttribute('nonce');
 }
 
 export const onerror = globalHook(esmsInitOptions.onerror || noop);
@@ -39,12 +39,6 @@ const enable = Array.isArray(esmsInitOptions.polyfillEnable) ? esmsInitOptions.p
 export const cssModulesEnabled = enable.includes('css-modules');
 export const jsonModulesEnabled = enable.includes('json-modules');
 
-declare global {
-  interface Navigator {
-    userAgentData?: object;
-  }
-}
-
 export const edge = !navigator.userAgentData && !!navigator.userAgent.match(/Edge\/\d+\.\d+/);
 
 export const baseUrl = hasDocument
@@ -53,26 +47,22 @@ export const baseUrl = hasDocument
     ? location.pathname.slice(0, location.pathname.lastIndexOf('/') + 1) 
     : location.pathname}`;
 
-export const createBlob = (source: BlobPart, type = 'text/javascript') => URL.createObjectURL(new Blob([source], { type }));
+export const createBlob = (source, type = 'text/javascript') => URL.createObjectURL(new Blob([source], { type }));
 export let { skip } = esmsInitOptions;
 if (Array.isArray(skip)) {
   const l = skip.map(s => new URL(s, baseUrl).href);
-  skip = ((s: string) => l.some(i => i[i.length - 1] === '/' && s.startsWith(i) || s === i)) as unknown as RegExp;
+  skip = s => l.some(i => i[i.length - 1] === '/' && s.startsWith(i) || s === i);
 }
 else if (typeof skip === 'string') {
   const r = new RegExp(skip);
-  skip = ((s: string) => r.test(s)) as unknown as RegExp;
+  skip = s => r.test(s);
 }
 
-const eoop = (err: Error) => setTimeout(() => { throw err });
+const eoop = err => setTimeout(() => { throw err });
 
-declare global {
-  var safari: unknown;
-}
+export const throwError = err => { (self.reportError || hasWindow && window.safari && console.error || eoop)(err), void onerror(err) };
 
-export const throwError = (err: Error) => { (self.reportError || hasWindow && window.safari && console.error || eoop)(err), void onerror(err) };
-
-export function fromParent (parent: string) {
+export function fromParent (parent) {
   return parent ? ` imported from ${parent}` : '';
 }
 
@@ -84,12 +74,12 @@ export function setImportMapSrcOrLazy () {
 
 // shim mode is determined on initialization, no late shim mode
 if (!shimMode) {
-  if (document.querySelectorAll<HTMLLinkElement | HTMLScriptElement>('script[type=module-shim],script[type=importmap-shim],link[rel=modulepreload-shim]').length) {
+  if (document.querySelectorAll('script[type=module-shim],script[type=importmap-shim],link[rel=modulepreload-shim]').length) {
     shimMode = true;
   }
   else {
     let seenScript = false;
-    for (const script of document.querySelectorAll<HTMLScriptElement>('script[type=module],script[type=importmap]')) {
+    for (const script of document.querySelectorAll('script[type=module],script[type=importmap]')) {
       if (!seenScript) {
         if (script.type === 'module' && !script.ep)
           seenScript = true;

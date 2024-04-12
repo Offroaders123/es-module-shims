@@ -36,7 +36,7 @@ import {
   supportsJsonAssertions,
   featureDetectionPromise,
 } from './features.js';
-import * as lexer from 'es-module-lexer';
+import * as lexer from '../node_modules/es-module-lexer/dist/lexer.asm.js';
 
 async function _resolve (id, parentUrl) {
   const urlResolved = resolveIfNotPlainOrUrl(id, parentUrl);
@@ -79,15 +79,15 @@ async function importShim (id, ...args) {
 
 self.importShim = importShim;
 
-function defaultResolve (id: string, parentUrl: string) {
+function defaultResolve (id, parentUrl) {
   return resolveImportMap(importMap, resolveIfNotPlainOrUrl(id, parentUrl) || id, parentUrl) || throwUnresolved(id, parentUrl);
 }
 
-function throwUnresolved (id: string, parentUrl: string) {
+function throwUnresolved (id, parentUrl) {
   throw Error(`Unable to resolve specifier '${id}'${fromParent(parentUrl)}`);
 }
 
-const resolveSync = (id: string, parentUrl: string = pageBaseUrl) => {
+const resolveSync = (id, parentUrl = pageBaseUrl) => {
   parentUrl = `${parentUrl}`;
   const result = resolveHook && resolveHook(id, parentUrl, defaultResolve);
   return result && !result.then ? result : defaultResolve(id, parentUrl);
@@ -117,7 +117,7 @@ async function loadAll (load, seen) {
     load.n = load.d.some(dep => dep.n);
 }
 
-let importMap: ImportMap = { imports: {}, scopes: {} };
+let importMap = { imports: {}, scopes: {} };
 let baselinePassthrough;
 
 const initPromise = featureDetectionPromise.then(() => {
