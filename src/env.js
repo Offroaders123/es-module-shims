@@ -25,11 +25,8 @@ if (!nonce && hasDocument) {
 }
 
 export const onerror = globalHook(esmsInitOptions.onerror || noop);
-export const onpolyfill = esmsInitOptions.onpolyfill ? globalHook(esmsInitOptions.onpolyfill) : () => {
-  console.log('%c^^ Module TypeError above is polyfilled and can be ignored ^^', 'font-weight:900;color:#391');
-};
 
-export const { revokeBlobURLs, noLoadEventRetriggers, enforceIntegrity } = esmsInitOptions;
+export const { revokeBlobURLs, noLoadEventRetriggers, globalLoadEventRetrigger, enforceIntegrity } = esmsInitOptions;
 
 function globalHook (name) {
   return typeof name === 'string' ? self[name] : name;
@@ -38,6 +35,12 @@ function globalHook (name) {
 const enable = Array.isArray(esmsInitOptions.polyfillEnable) ? esmsInitOptions.polyfillEnable : [];
 export const cssModulesEnabled = enable.includes('css-modules');
 export const jsonModulesEnabled = enable.includes('json-modules');
+export const wasmModulesEnabled = enable.includes('wasm-modules');
+export const sourcePhaseEnabled = enable.includes('source-phase');
+
+export const onpolyfill = esmsInitOptions.onpolyfill ? globalHook(esmsInitOptions.onpolyfill) : () => {
+  console.log(`%c^^ Module error above is polyfilled and can be ignored ^^`, 'font-weight:900;color:#391');
+};
 
 export const edge = !navigator.userAgentData && !!navigator.userAgent.match(/Edge\/\d+\.\d+/);
 
@@ -56,11 +59,13 @@ if (Array.isArray(skip)) {
 else if (typeof skip === 'string') {
   const r = new RegExp(skip);
   skip = s => r.test(s);
+} else if (skip instanceof RegExp) {
+  skip = s => skip.test(s);
 }
 
-const eoop = err => setTimeout(() => { throw err });
+const dispatchError = error => self.dispatchEvent(Object.assign(new Event('error'), { error }));
 
-export const throwError = err => { (self.reportError || hasWindow && window.safari && console.error || eoop)(err), void onerror(err) };
+export const throwError = err => { (self.reportError || dispatchError)(err), void onerror(err) };
 
 export function fromParent (parent) {
   return parent ? ` imported from ${parent}` : '';

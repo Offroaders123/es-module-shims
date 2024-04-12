@@ -12,6 +12,7 @@ The following modules features are polyfilled:
 * Dynamic `import()` shimming when necessary in eg older Firefox versions.
 * `import.meta` and `import.meta.url`.
 * [JSON](#json-modules) and [CSS modules](#css-modules) with import assertions (when enabled).
+* [Wasm modules](#wasm-modules) with support for Source Phase Imports (when enabled).
 * [`<link rel="modulepreload">` is shimmed](#modulepreload) in browsers without import maps support.
 
 When running in shim mode, module rewriting is applied for all users and custom [resolve](#resolve-hook) and [fetch](#fetch-hook) hooks can be implemented allowing for custom resolution and streaming in-browser transform workflows.
@@ -29,7 +30,7 @@ Because we are still using the native module loader the edge cases work out comp
 Include ES Module Shims with a `async` attribute on the script, then include an import map and module scripts normally:
 
 ```html
-<script async src="https://ga.jspm.io/npm:es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+<script async src="https://ga.jspm.io/npm:es-module-shims@1.9.0/dist/es-module-shims.js"></script>
 
 <!-- https://generator.jspm.io/#U2NhYGBkDM0rySzJSU1hKEpNTC5xMLTQM9Az0C1K1jMAAKFS5w0gAA -->
 <script type="importmap">
@@ -71,7 +72,7 @@ If one is found, it will then be reexecuted through ES Module Shims using its in
 When the polyfill kicks in another console log message is output(which can be disabled or customized via the [polyfill hook](#polyfill-hook)):
 
 ```
-^^ Module TypeError above is polyfilled and can be ignored ^^
+^^ Module error above is polyfilled and can be ignored ^^
 ```
 
 ### Polyfill Edge Case: Dynamic Import
@@ -182,7 +183,7 @@ If using more modern features like CSS Modules or JSON Modules, these need to be
 
 ```html
 <script>
-window.esmsInitOptions = { polyfillEnable: ['css-modules', 'json-modules'] }
+window.esmsInitOptions = { polyfillEnable: ['css-modules', 'json-modules', 'wasm-modules'] }
 </script>
 ```
 
@@ -222,13 +223,13 @@ Browser Compatibility on baseline ES modules support **with** ES Module Shims:
 | [Import Maps](#import-maps)                     | :heavy_check_mark:                   | :heavy_check_mark:                   | :heavy_check_mark:                   |
 | [JSON Modules](#json-modules)                   | :heavy_check_mark:                   | :heavy_check_mark:                   | :heavy_check_mark:                   |
 | [CSS Modules](#css-modules)                     | :heavy_check_mark:<sup>1</sup>       | :heavy_check_mark:<sup>1</sup>       | :heavy_check_mark:<sup>1</sup>       |
+| [Wasm Modules](#wasm-modules)                   | 89+                                  | 89+                                  | 15+                                  |
 | [import.meta.resolve](#resolve)                 | :heavy_check_mark:                   | :heavy_check_mark:                   | :heavy_check_mark:                   |
-| [Module Workers](#module-workers) (via wrapper) | 63+                                  | :x:<sup>2</sup>                      | 15+                                  |
+| [Module Workers](#module-workers) (via wrapper) | 63+                                  | ~113+                                | 15+                                  |
 | Top-Level Await (unpolyfilled<sup>3</sup>)      | 89+                                  | 89+                                  | 15+                                  |
 
 * 1: _CSS module support requires a separate [Constructable Stylesheets polyfill](https://github.com/calebdwilliams/construct-style-sheets#readme)._
-* 2: _Module worker support cannot yet be implemented in Firefox due to no dynamic import support in web workers._
-* 3: _Top-level await support is not currently polyfilled but is possible for ES Module Shims to implement for intermediate browser versions, with the feature request tracking in https://github.com/guybedford/es-module-shims/issues/5. The compatibility gap with native modules is currently < 5% of users so it may not even be necessary._
+* 2: _Top-level await support is not currently polyfilled but is possible for ES Module Shims to implement for intermediate browser versions, with the feature request tracking in https://github.com/guybedford/es-module-shims/issues/5. The compatibility gap with native modules is currently < 5% of users so it may not even be necessary._
 
 Browser compatibility **without** ES Module Shims:
 
@@ -240,8 +241,9 @@ Browser compatibility **without** ES Module Shims:
 | [Import Maps](#import-maps)        | 89+                | 108+               | 16.4+              |
 | [JSON Modules](#json-modules)      | 91+                | :x:                | :x:                |
 | [CSS Modules](#css-modules)        | 95+                | :x:                | :x:                |
+| [Wasm Modules](#wasm-modules)      | :x:                | :x:                | :x:                |
 | [import.meta.resolve](#resolve)    | :x:                | :x:                | :x:                |
-| [Module Workers](#module-workers)  | ~68+               | :x:                | :x:                |
+| [Module Workers](#module-workers)  | ~68+               | ~113+              | 15+                |
 | Top-Level Await                    | 89+                | 89+                | 15+                |
 
 * ❕<sup>1</sup>: On module redirects, Safari returns the request URL in `import.meta.url` instead of the response URL as per the spec.
@@ -402,13 +404,11 @@ JSON Modules are currently supported in Chrome when using them via an import ass
 
 ```html
 <script type="module">
-import json from 'https://site.com/data.json' assert { type: 'json' };
+import json from 'https://site.com/data.json' with { type: 'json' };
 </script>
 ```
 
 In addition JSON modules need to be served with a valid JSON content type.
-
-Checks for assertion failures are not currently included.
 
 ### CSS Modules
 
@@ -420,7 +420,7 @@ CSS Modules are currently supported in Chrome when using them via an import asse
 
 ```html
 <script type="module">
-import sheet from 'https://site.com/sheet.css' assert { type: 'css' };
+import sheet from 'https://site.com/sheet.css' with { type: 'css' };
 </script>
 ```
 
@@ -434,7 +434,38 @@ For more information see the [web.dev article](https://web.dev/css-module-script
 
 In addition CSS modules need to be served with a valid CSS content type.
 
-Checks for assertion failures are not currently included.
+### Wasm Modules
+
+> Stability: WebAssembly Standard, Unimplemented
+
+Implements the [WebAssembly ESM Integration](https://github.com/WebAssembly/esm-integration) spec, including support for source phase imports.
+
+In shim mode, Wasm modules are always supported. In polyfill mode, Wasm modules require the `polyfillEnable: ['wasm-modules']` [init option](#polyfill-enable-option).
+
+WebAssembly module exports are made available as module exports and WebAssembly module imports will be resolved using the browser module loader.
+
+When using the source phase import form, this must be enabled separately via the `polyfillEnabe: ['wasm-modules', 'source-phase']` [init option](#polyfill-enable-option) to support source imports to WebAssembly modules.
+
+When enabling `'source-phase'`, `WebAssembly.Module` is also polyfilled to extend from `AbstractModuleSource` per the source phase proposal.
+
+WebAssembly modules require native top-level await support to be polyfilled, see the [compatibility table](#browser-support) above.
+
+```html
+<script type="module">
+import { fn } from './app.wasm';
+</script>
+```
+
+And for the source phase:
+
+```html
+<script type="module">
+import source mod from './app.wasm';
+const instance = await WebAssembly.instantiate(mod, { /* ...imports */ });
+</script>
+```
+
+If using CSP, make sure to add `'unsafe-wasm-eval'` to `script-src` which is needed when the shim or polyfill engages, note this policy is much much safer than eval due to the Wasm secure sandbox. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src#unsafe_webassembly_execution.
 
 ### Resolve
 
@@ -459,7 +490,7 @@ Node.js also implements a similar API, although it's in the process of shifting 
 
 ### Module Workers
 
-ES Module Shims can be used in module workers in browsers that provide dynamic import in worker environments, which at the moment are Chrome(80+), Edge(80+) and Safari(15+).
+ES Module Shims can be used in module workers in browsers that provide dynamic import in worker environments, which at the moment are Chrome(80+), Edge(80+), Firefox(~113+) and Safari(15+).
 
 By default, when there is no DOM present, ES Module Shims will switch into shim mode. An example of ES Module Shims usage through shim mode in web workers is provided below:
 
@@ -497,6 +528,7 @@ Provide a `esmsInitOptions` on the global scope before `es-module-shims` is load
 * [mapOverrides](#overriding-import-map-entries)
 * [modulepreload](#modulepreload)
 * [noLoadEventRetriggers](#no-load-event-retriggers)
+* [globalLoadEventRetrigger](#global-load-event-retrigger)
 * [nonce](#nonce)
 * [onerror](#error-hook)
 * [onpolyfill](#polyfill-hook)
@@ -515,8 +547,10 @@ window.esmsInitOptions = {
   polyfillEnable: ['css-modules', 'json-modules'], // default empty
   // Custom CSP nonce
   nonce: 'n0nce', // default is automatic detection
-  // Don't retrigger load events on module scripts
+  // Don't retrigger load events on module scripts (DOMContentLoaded, domready)
   noLoadEventRetriggers: true, // default false
+  // Retrigger window 'load' event (will be combined into load event above on next major)
+  globalLoadEventRetrigger: true, // default false
   // Skip source analysis of certain URLs for full native passthrough
   skip: /^https:\/\/cdn\.com/, // defaults to null
   // Clean up blob URLs after execution
@@ -580,7 +614,7 @@ DOM `load` events are fired for all `"module-shim"` scripts both for success and
 
 The `polyfillEnable` option allows enabling polyfill features which are newer and would otherwise result in unnecessary polyfilling in modern browsers that haven't yet updated.
 
-Currently this option supports just `"css-modules"` and `"json-modules"`.
+This options supports `"css-modules"`, `"json-modules"`, `"wasm-modules"`, `"source-phase"`.
 
 ```html
 <script type="esms-options">
@@ -638,6 +672,8 @@ Alternatively, add a `blob:` URL policy with the CSP build to get CSP compatibil
 
 Because of the extra processing done by ES Module Shims it is possible for static module scripts to execute after the `DOMContentLoaded` or `readystatechange` events they expect, which can cause missed attachment.
 
+In addition, script elements will also have their load events refired when polyfilled.
+
 In order to ensure libraries that rely on these event still behave correctly, ES Module Shims will always double trigger these events that would normally have executed before the document ready state transition to completion, once all the static module scripts in the page have been completely executed through ES module shims.
 
 In such a case, this double event firing can be disabled with the `noLoadEventRetriggers` option:
@@ -651,6 +687,13 @@ In such a case, this double event firing can be disabled with the `noLoadEventRe
 </script>
 <script async src="es-module-shims.js"></script>
 ```
+
+### Global Load Event Retrigger
+
+In ES Module Shims 1.x, load event retriggers only apply to `DOMContentLoaded` and `readystatechange` and not to the window `load` event.
+To enable the window / worker `'load'` event, set `globalLoadEventRetrigger: true`.
+
+In the next major version, this will be the default for load events, at which point only `noLoadEventRetriggers` will remain.
 
 ### Skip
 

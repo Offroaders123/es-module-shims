@@ -6,9 +6,9 @@ interface ESMSInitOptions {
 
   /**
    * Enable polyfill features.
-   * Currently supports ['css-modules', 'json-modules']
+   * Currently supports ['css-modules', 'json-modules', 'wasm-modules', 'source-phase']
    */
-  polyfillEnable?: Array<'css-modules' | 'json-modules'>
+  polyfillEnable?: Array<'css-modules' | 'json-modules' | 'wasm-modules' | 'source-phase'>
 
   /**
    * #### Enforce Integrity
@@ -24,9 +24,14 @@ interface ESMSInitOptions {
   nonce?: boolean;
 
   /**
-   * Disable retriggering of document readystate
+   * Disable retriggering of document readystate and DOMContentLoaded
    */
-  noLoadEventRetriggers?: true;
+  noLoadEventRetriggers?: boolean;
+
+  /**
+   * Enable retriggering of the Window / global 'load' event
+   */
+  globalLoadEventRetrigger?: boolean;
 
   /**
    * #### Skip Processing Stability
@@ -49,7 +54,7 @@ interface ESMSInitOptions {
    * By default, this expression supports jspm.dev, dev.jspm.io and
    * cdn.pika.dev.
    */
-  skip?: RegExp;
+  skip?: RegExp | string[] | string
 
   /**
    * #### Error hook
