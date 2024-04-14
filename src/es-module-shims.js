@@ -41,8 +41,14 @@ import {
   supportsSourcePhase,
   featureDetectionPromise,
 } from './features.js';
+// @ts-expect-error - untyped
 import * as lexer from '../node_modules/es-module-lexer/dist/lexer.asm.js';
 
+/**
+ * @param {string} id
+ * @param {string} parentUrl
+ * @returns {Promise<{ r: string; b: boolean; }>}
+ */
 async function _resolve (id, parentUrl) {
   const urlResolved = resolveIfNotPlainOrUrl(id, parentUrl) || asURL(id);
   return {
@@ -52,19 +58,25 @@ async function _resolve (id, parentUrl) {
   };
 }
 
-const resolve = resolveHook ? async (id, parentUrl) => {
+/** @type {typeof _resolve} */
+const resolve = resolveHook ? /** @type {typeof _resolve} */ (async (id, parentUrl) => {
   let result = resolveHook(id, parentUrl, defaultResolve);
   // will be deprecated in next major
-  if (result && result.then)
+  if (result && typeof result !== "string")
     result = await result;
   return result ? { r: result, b: !resolveIfNotPlainOrUrl(id, parentUrl) && !asURL(id) } : _resolve(id, parentUrl);
-} : _resolve;
+}) : _resolve;
 
 // supports:
 // import('mod');
 // import('mod', { opts });
 // import('mod', { opts }, parentUrl);
 // import('mod', parentUrl);
+/**
+ * @param {string} id
+ * @param {...(object | string)} [args]
+ * @returns {Promise<string>}
+ */
 async function importHandler (id, ...args) {
   // parentUrl if present will be the last argument
   let parentUrl = args[args.length - 1];
@@ -84,13 +96,17 @@ async function importHandler (id, ...args) {
 }
 
 // import()
+/**
+ * @param {Parameters<typeof importHandler>} args
+ * @returns {ReturnType<typeof topLevelLoad>}
+ */
 async function importShim (...args) {
   return topLevelLoad(await importHandler(...args), { credentials: 'same-origin' });
 }
 
 // import.source()
 if (sourcePhaseEnabled)
-importShim.source = async function importShimSource (...args) {
+importShim.source = async function importShimSource (/** @type {Parameters<typeof importHandler>} */ ...args) {
   const url = await importHandler(...args);
   const load = getOrCreateLoad(url, { credentials: 'same-origin' }, null, null);
   lastLoad = undefined;
@@ -104,34 +120,62 @@ importShim.source = async function importShimSource (...args) {
 
 self.importShim = importShim;
 
+/**
+ * @param {string} id
+ * @param {string} parentUrl
+ * @returns {string}
+ */
 function defaultResolve (id, parentUrl) {
   return resolveImportMap(importMap, resolveIfNotPlainOrUrl(id, parentUrl) || id, parentUrl) || throwUnresolved(id, parentUrl);
 }
 
+/**
+ * @param {string} id
+ * @param {string} parentUrl
+ * @returns {never}
+ */
 function throwUnresolved (id, parentUrl) {
   throw Error(`Unable to resolve specifier '${id}'${fromParent(parentUrl)}`);
 }
 
+/**
+ * @param {string} id
+ * @param {string} [parentUrl]
+ * @returns {string}
+ */
 const resolveSync = (id, parentUrl = pageBaseUrl) => {
   parentUrl = `${parentUrl}`;
   const result = resolveHook && resolveHook(id, parentUrl, defaultResolve);
-  return result && !result.then ? result : defaultResolve(id, parentUrl);
+  return result && typeof result === "string" ? result : defaultResolve(id, parentUrl);
 };
 
-function metaResolve (id, parentUrl = this.url) {
-  return resolveSync(id, parentUrl);
+/**
+ * @this {(typeof registry)[number]["m"]}
+ * @param {string} id
+ * @param {string} [parentUrl]
+ * @returns {string}
+ */
+function metaResolve (id, parentUrl) {
+  return resolveSync(id, parentUrl ?? this.url);
 }
 
 importShim.resolve = resolveSync;
 importShim.getImportMap = () => JSON.parse(JSON.stringify(importMap));
-importShim.addImportMap = importMapIn => {
+importShim.addImportMap = (/** @type {Partial<ImportMap>} */ importMapIn) => {
   if (!shimMode) throw new Error('Unsupported in polyfill mode.');
   importMap = resolveAndComposeImportMap(importMapIn, pageBaseUrl, importMap);
 }
 
+/** @type {Record<string, { u: string; r?: string; f?: Promise<typeof registry[number]>; S: string; L?: Promise<>; a?: [{ s: number; ss: number; se: number; n: string; d: number; t: number; }[], { s: number; e: number; ln: ; }[], boolean]; d?: { l: (typeof registry[number]); s: boolean; }[]; b?: string; s?: string; n: boolean; t: string | null; m: { url: string; resolve: typeof metaResolve; }; }>} */
 const registry = importShim._r = {};
+/** @type {Record<string, WebAssembly.Module>} */
 const sourceCache = importShim._s = {};
 
+/**
+ * @param {(typeof registry)[number]} load
+ * @param {Record<string, number>} seen
+ * @returns {Promise<void>}
+ */
 async function loadAll (load, seen) {
   seen[load.u] = 1;
   await load.L;
@@ -146,7 +190,9 @@ async function loadAll (load, seen) {
     load.n = load.d.some(dep => dep.l.n);
 }
 
+/** @type {ImportMap} */
 let importMap = { imports: {}, scopes: {} };
+/** @type {boolean} */
 let baselinePassthrough;
 
 const initPromise = featureDetectionPromise.then(() => {
@@ -154,15 +200,20 @@ const initPromise = featureDetectionPromise.then(() => {
   if (self.ESMS_DEBUG) console.info(`es-module-shims: init ${shimMode ? 'shim mode' : 'polyfill mode'}, ${baselinePassthrough ? 'baseline passthrough' : 'polyfill engaged'}`);
   if (sourcePhaseEnabled && typeof WebAssembly !== 'undefined' && !Object.getPrototypeOf(WebAssembly.Module).name) {
     const s = Symbol();
+    /**
+     * @param {WebAssembly.Module} m
+     * @returns {WebAssembly.Module & { [typeof s]: "WebAssembly.Module"; }}
+     */
     const brand = m => Object.defineProperty(m, s, { writable: false, configurable: false, value: 'WebAssembly.Module' });
     class AbstractModuleSource {
       get [Symbol.toStringTag]() {
+        // @ts-expect-error - class symbol indexing errors
         if (this[s]) return this[s];
         throw new TypeError('Not an AbstractModuleSource');
       }
     }
     const { Module: wasmModule, compile: wasmCompile, compileStreaming: wasmCompileStreaming } = WebAssembly;
-    WebAssembly.Module = Object.setPrototypeOf(Object.assign(function Module (...args) {
+    WebAssembly.Module = Object.setPrototypeOf(Object.assign(function Module (/** @type {ConstructorParameters<typeof wasmModule>} */ ...args) {
       return brand(new wasmModule(...args));
     }, wasmModule), AbstractModuleSource);
     WebAssembly.Module.prototype = Object.setPrototypeOf(wasmModule.prototype, AbstractModuleSource.prototype);
@@ -183,13 +234,13 @@ const initPromise = featureDetectionPromise.then(() => {
         for (const mutation of mutations) {
           if (mutation.type !== 'childList') continue;
           for (const node of mutation.addedNodes) {
-            if (node.tagName === 'SCRIPT') {
+            if (node instanceof HTMLScriptElement) {
               if (node.type === (shimMode ? 'module-shim' : 'module'))
                 processScript(node, true);
               if (node.type === (shimMode ? 'importmap-shim' : 'importmap'))
                 processImportMap(node, true);
             }
-            else if (node.tagName === 'LINK' && node.rel === (shimMode ? 'modulepreload-shim' : 'modulepreload')) {
+            else if (node instanceof HTMLLinkElement && node.rel === (shimMode ? 'modulepreload-shim' : 'modulepreload')) {
               processPreload(node);
             }
           }
@@ -218,6 +269,13 @@ let importMapPromise = initPromise;
 let firstPolyfillLoad = true;
 let acceptingImportMaps = true;
 
+/**
+ * @param {string} url
+ * @param {ReturnType<typeof getFetchOpts>} fetchOpts
+ * @param {string} [source]
+ * @param {boolean} [nativelyLoaded]
+ * @param {Promise<void>} [lastStaticLoadPromise]
+ */
 async function topLevelLoad (url, fetchOpts, source, nativelyLoaded, lastStaticLoadPromise) {
   if (!shimMode)
     acceptingImportMaps = false;
@@ -235,6 +293,7 @@ async function topLevelLoad (url, fetchOpts, source, nativelyLoaded, lastStaticL
   }
   const load = getOrCreateLoad(url, fetchOpts, null, source);
   linkLoad(load, fetchOpts);
+  /** @type {Record<string, number>} */
   const seen = {};
   await loadAll(load, seen);
   lastLoad = undefined;
@@ -259,6 +318,10 @@ async function topLevelLoad (url, fetchOpts, source, nativelyLoaded, lastStaticL
   return module;
 }
 
+/**
+ * @param {string[]} registryKeys
+ * @returns {void}
+ */
 function revokeObjectURLs(registryKeys) {
   let batch = 0;
   const keysLength = registryKeys.length;
@@ -276,11 +339,21 @@ function revokeObjectURLs(registryKeys) {
   }
 }
 
+/**
+ * @param {string} url
+ * @returns {string}
+ */
 function urlJsString (url) {
   return `'${url.replace(/'/g, "\\'")}'`;
 }
 
+/** @type {string | undefined} */
 let lastLoad;
+/**
+ * @param {(typeof registry)[number]} load
+ * @param {Record<string, number>} seen
+ * @returns {void}
+ */
 function resolveDeps (load, seen) {
   if (load.b || !seen[load.u])
     return;
@@ -301,7 +374,11 @@ function resolveDeps (load, seen) {
 
   // once all deps have loaded we can inline the dependency resolution blobs
   // and define this blob
-  let lastIndex = 0, depIndex = 0, dynamicImportEndStack = [];
+  let lastIndex = 0, depIndex = 0, dynamicImportEndStack = /** @type {number[]} */ ([]);
+  /**
+   * @param {number} originalIndex
+   * @returns {void}
+   */
   function pushStringTo (originalIndex) {
     while (dynamicImportEndStack[dynamicImportEndStack.length - 1] < originalIndex) {
       const dynamicImportEnd = dynamicImportEndStack.pop();
@@ -373,6 +450,11 @@ function resolveDeps (load, seen) {
   if (load.s)
     resolvedSource += `\n;import{u$_}from'${load.s}';try{u$_({${exports.filter(e => e.ln).map(({ s, e, ln }) => `${source.slice(s, e)}:${ln}`).join(',')}})}catch(_){};\n`;
 
+  /**
+   * @param {string} commentPrefix
+   * @param {number} commentStart
+   * @returns {void}
+   */
   function pushSourceURL (commentPrefix, commentStart) {
     const urlStart = commentStart + commentPrefix.length;
     const commentEnd = source.indexOf('\n', urlStart);
@@ -421,18 +503,31 @@ const cssContentType = /^(text|application)\/css(;|$)/;
 const cssUrlRegEx = /url\(\s*(?:(["'])((?:\\.|[^\n\\"'])+)\1|((?:\\.|[^\s,"'()\\])+))\s*\)/g;
 
 // restrict in-flight fetches to a pool of 100
+/** @type {((value: void | PromiseLike<void>) => void)[]} */
 let p = [];
 let c = 0;
+/**
+ * @returns {Promise<void>}
+ */
 function pushFetchPool () {
   if (++c > 100)
     return new Promise(r => p.push(r));
 }
+/**
+ * @returns {void}
+ */
 function popFetchPool () {
   c--;
   if (p.length)
     p.shift()();
 }
 
+/**
+ * @param {string} url
+ * @param {ReturnType<typeof getFetchOpts>} [fetchOpts]
+ * @param {string} [parent]
+ * @returns {Promise<Response>}
+ */
 async function doFetch (url, fetchOpts, parent) {
   if (enforceIntegrity && !fetchOpts.integrity)
     throw Error(`No integrity for ${url}${fromParent(parent)}.`);
@@ -442,7 +537,7 @@ async function doFetch (url, fetchOpts, parent) {
     var res = await fetchHook(url, fetchOpts);
   }
   catch (e) {
-    e.message = `Unable to fetch ${url}${fromParent(parent)} - see network log for details.\n` + e.message;
+    /** @type {Error} */ (e).message = `Unable to fetch ${url}${fromParent(parent)} - see network log for details.\n` + /** @type {Error} */ (e).message;
     throw e;
   }
   finally {
@@ -450,6 +545,7 @@ async function doFetch (url, fetchOpts, parent) {
   }
 
   if (!res.ok) {
+    /** @type {TypeError & { response?: Response; }} */
     const error = new TypeError(`${res.status} ${res.statusText} ${res.url}${fromParent(parent)}`);
     error.response = res;
     throw error;
@@ -457,6 +553,12 @@ async function doFetch (url, fetchOpts, parent) {
   return res;
 }
 
+/**
+ * @param {string} url
+ * @param {ReturnType<typeof getFetchOpts>} fetchOpts
+ * @param {string} [parent]
+ * @returns {Promise<{ r: string; s: string; t: string; ss?: null; sp?: any | null; }>}
+ */
 async function fetchModule (url, fetchOpts, parent) {
   const res = await doFetch(url, fetchOpts, parent);
   const r = res.url;
@@ -490,6 +592,12 @@ async function fetchModule (url, fetchOpts, parent) {
     throw Error(`Unsupported Content-Type "${contentType}" loading ${url}${fromParent(parent)}. Modules must be served with a valid MIME type like application/javascript.`);
 }
 
+/**
+ * @param {string} url
+ * @param {ReturnType<getFetchOpts>} fetchOpts
+ * @param {string | null} parent
+ * @param {string} source
+ */
 function getOrCreateLoad (url, fetchOpts, parent, source) {
   if (source && registry[url]) {
     let i = 0;
@@ -548,8 +656,17 @@ function getOrCreateLoad (url, fetchOpts, parent, source) {
   return load;
 }
 
+/**
+ * @param {ESMSInitOptions["polyfillEnable"][number]} feat
+ * @returns {Error}
+ */
 const featErr = feat => Error(`${feat} feature must be enabled via <script type="esms-options">{ "polyfillEnable": ["${feat}"] }<${''}/script>`);
 
+/**
+ * @param {(typeof registry)[number]} load
+ * @param {ReturnType<typeof getFetchOpts>} [fetchOpts]
+ * @returns {void}
+ */
 function linkLoad (load, fetchOpts) {
   if (load.L) return;
   load.L = load.f.then(async () => {
@@ -577,26 +694,35 @@ function linkLoad (load, fetchOpts) {
   });
 }
 
+/**
+ * @param {boolean} [mapsOnly]
+ * @returns {void}
+ */
 function processScriptsAndPreloads (mapsOnly = false) {
   if (self.ESMS_DEBUG) console.info(`es-module-shims: processing scripts`);
   if (!mapsOnly)
-    for (const link of document.querySelectorAll(shimMode ? 'link[rel=modulepreload-shim]' : 'link[rel=modulepreload]'))
+    for (const link of /** @type {NodeListOf<HTMLLinkElement>} */ (document.querySelectorAll(shimMode ? 'link[rel=modulepreload-shim]' : 'link[rel=modulepreload]')))
       processPreload(link);
-  for (const script of document.querySelectorAll(shimMode ? 'script[type=importmap-shim]' : 'script[type=importmap]'))
+  for (const script of /** @type {NodeListOf<HTMLScriptElement>} */ (document.querySelectorAll(shimMode ? 'script[type=importmap-shim]' : 'script[type=importmap]')))
     processImportMap(script);
   if (!mapsOnly)
-    for (const script of document.querySelectorAll(shimMode ? 'script[type=module-shim]' : 'script[type=module]'))
+    for (const script of /** @type {NodeListOf<HTMLScriptElement>} */ (document.querySelectorAll(shimMode ? 'script[type=module-shim]' : 'script[type=module]')))
       processScript(script);
 }
 
+/**
+ * @param {HTMLScriptElement | HTMLLinkElement} script
+ * @returns {RequestInit}
+ */
 function getFetchOpts (script) {
+  /** @type {RequestInit} */
   const fetchOpts = {};
   if (script.integrity)
     fetchOpts.integrity = script.integrity;
   if (script.referrerPolicy)
-    fetchOpts.referrerPolicy = script.referrerPolicy;
+    fetchOpts.referrerPolicy = /** @type {ReferrerPolicy} */ (script.referrerPolicy);
   if (script.fetchPriority)
-    fetchOpts.priority = script.fetchPriority;
+    fetchOpts.priority = /** @type {RequestPriority} */ (script.fetchPriority);
   if (script.crossOrigin === 'use-credentials')
     fetchOpts.credentials = 'include';
   else if (script.crossOrigin === 'anonymous')
@@ -609,6 +735,9 @@ function getFetchOpts (script) {
 let lastStaticLoadPromise = Promise.resolve();
 
 let domContentLoadedCnt = 1;
+/**
+ * @returns {void}
+ */
 function domContentLoadedCheck () {
   if (--domContentLoadedCnt === 0 && !noLoadEventRetriggers && (shimMode || !baselinePassthrough)) {
     if (self.ESMS_DEBUG) console.info(`es-module-shims: DOMContentLoaded refire`);
@@ -616,6 +745,9 @@ function domContentLoadedCheck () {
   }
 }
 let loadCnt = 1;
+/**
+ * @returns {void}
+ */
 function loadCheck () {
   if (--loadCnt === 0 && globalLoadEventRetrigger && !noLoadEventRetriggers && (shimMode || !baselinePassthrough)) {
     if (self.ESMS_DEBUG) console.info(`es-module-shims: load refire`);
@@ -635,6 +767,9 @@ if (hasDocument) {
 }
 
 let readyStateCompleteCnt = 1;
+/**
+ * @returns {void}
+ */
 function readyStateCompleteCheck () {
   if (--readyStateCompleteCnt === 0 && !noLoadEventRetriggers && (shimMode || !baselinePassthrough)) {
     if (self.ESMS_DEBUG) console.info(`es-module-shims: readystatechange complete refire`);
@@ -642,9 +777,23 @@ function readyStateCompleteCheck () {
   }
 }
 
+/**
+ * @param {Node} script
+ * @returns {Node}
+ */
 const hasNext = script => script.nextSibling || script.parentNode && hasNext(script.parentNode);
+/**
+ * @param {HTMLScriptElement & { ep?: boolean; }} script
+ * @param {boolean} [ready]
+ * @returns {boolean}
+ */
 const epCheck = (script, ready) => script.ep || !ready && (!script.src && !script.innerHTML || !hasNext(script)) || script.getAttribute('noshim') !== null || !(script.ep = true);
 
+/**
+ * @param {HTMLScriptElement} script
+ * @param {boolean} [ready]
+ * @returns {void}
+ */
 function processImportMap (script, ready = readyStateCompleteCnt > 0) {
   if (epCheck(script, ready)) return;
   // we dont currently support multiple, external or dynamic imports maps in polyfill mode to match native
@@ -669,6 +818,11 @@ function processImportMap (script, ready = readyStateCompleteCnt > 0) {
   }
 }
 
+/**
+ * @param {HTMLScriptElement} script
+ * @param {boolean} [ready]
+ * @returns {void}
+ */
 function processScript (script, ready = readyStateCompleteCnt > 0) {
   if (epCheck(script, ready)) return;
   // does this load block readystate complete
@@ -692,7 +846,12 @@ function processScript (script, ready = readyStateCompleteCnt > 0) {
     loadPromise.then(loadCheck);
 }
 
+/** @type {Record<string, ReturnType<fetchModule>>} */
 const fetchCache = {};
+/**
+ * @param {HTMLLinkElement & { ep?: boolean; }} link
+ * @returns {void}
+ */
 function processPreload (link) {
   if (link.ep) return;
   link.ep = true;

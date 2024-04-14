@@ -21,7 +21,7 @@ interface ESMSInitOptions {
   /**
    * Nonce for CSP build
    */
-  nonce?: boolean;
+  nonce?: string;
 
   /**
    * Disable retriggering of document readystate and DOMContentLoaded
@@ -180,7 +180,7 @@ interface ESMSInitOptions {
    * Register a callback for top-level imports.
    *
    */
-  onimport?: (url: string, options: any, parentUrl: string) => void;
+  onimport?: (url: string, options: any, parentUrl: string) => Promise<void>;
 }
 
 interface ImportMap {

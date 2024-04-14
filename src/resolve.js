@@ -1,9 +1,14 @@
 import { mapOverrides, shimMode } from './env.js';
 
+/** @type {ImportMap} */
 export let importMap = { imports: Object.create(null), scopes: Object.create(null) };
 
 const backslashRegEx = /\\/g;
 
+/**
+ * @param {string} url
+ * @returns {string | undefined}
+ */
 export function asURL (url) {
   try {
     if (url.indexOf(':') !== -1)
@@ -12,10 +17,20 @@ export function asURL (url) {
   catch (_) {}
 }
 
+/**
+ * @param {string} relUrl
+ * @param {string} parentUrl
+ * @returns {string}
+ */
 export function resolveUrl (relUrl, parentUrl) {
   return resolveIfNotPlainOrUrl(relUrl, parentUrl) || (asURL(relUrl) || resolveIfNotPlainOrUrl('./' + relUrl, parentUrl));
 }
 
+/**
+ * @param {string} relUrl
+ * @param {string} parentUrl
+ * @returns {string}
+ */
 export function resolveIfNotPlainOrUrl (relUrl, parentUrl) {
   const hIdx = parentUrl.indexOf('#'), qIdx = parentUrl.indexOf('?');
   if (hIdx + qIdx > -2)
@@ -99,7 +114,14 @@ export function resolveIfNotPlainOrUrl (relUrl, parentUrl) {
   }
 }
 
+/**
+ * @param {Partial<ImportMap>} json
+ * @param {string} baseUrl
+ * @param {ImportMap} parentMap
+ * @returns {ImportMap}
+ */
 export function resolveAndComposeImportMap (json, baseUrl, parentMap) {
+  /** @type {ImportMap} */
   const outMap = { imports: Object.assign({}, parentMap.imports), scopes: Object.assign({}, parentMap.scopes) };
 
   if (json.imports)
@@ -114,6 +136,11 @@ export function resolveAndComposeImportMap (json, baseUrl, parentMap) {
   return outMap;
 }
 
+/**
+ * @param {string} path
+ * @param {ImportMap[keyof ImportMap]} matchObj
+ * @returns {string}
+ */
 function getMatch (path, matchObj) {
   if (matchObj[path])
     return path;
@@ -125,6 +152,11 @@ function getMatch (path, matchObj) {
   } while ((sepIndex = path.lastIndexOf('/', sepIndex - 1)) !== -1)
 }
 
+/**
+ * @param {string} id
+ * @param {Record<string, string>} packages
+ * @returns {string}
+ */
 function applyPackages (id, packages) {
   const pkgName = getMatch(id, packages);
   if (pkgName) {
@@ -135,6 +167,12 @@ function applyPackages (id, packages) {
 }
 
 
+/**
+ * @param {ImportMap} importMap
+ * @param {string} resolvedOrPlain
+ * @param {string} parentUrl
+ * @returns {string}
+ */
 export function resolveImportMap (importMap, resolvedOrPlain, parentUrl) {
   let scopeUrl = parentUrl && getMatch(parentUrl, importMap.scopes);
   while (scopeUrl) {
@@ -146,6 +184,13 @@ export function resolveImportMap (importMap, resolvedOrPlain, parentUrl) {
   return applyPackages(resolvedOrPlain, importMap.imports) || resolvedOrPlain.indexOf(':') !== -1 && resolvedOrPlain;
 }
 
+/**
+ * @param {Record<string, string>} packages
+ * @param {Record<string, string>} outPackages
+ * @param {string} baseUrl
+ * @param {ImportMap} parentMap
+ * @returns {void}
+ */
 function resolveAndComposePackages (packages, outPackages, baseUrl, parentMap) {
   for (let p in packages) {
     const resolvedLhs = resolveIfNotPlainOrUrl(p, baseUrl) || p;

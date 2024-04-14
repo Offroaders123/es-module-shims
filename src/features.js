@@ -31,6 +31,9 @@ export let featureDetectionPromise = Promise.resolve(dynamicImportCheck).then(()
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.setAttribute('nonce', nonce);
+    /**
+     * @param {MessageEvent} event
+     */
     function cb ({ data }) {
       const isFeatureDetectionMessage = Array.isArray(data) && data[0] === 'esms';
       if (!isFeatureDetectionMessage)
@@ -52,6 +55,9 @@ export let featureDetectionPromise = Promise.resolve(dynamicImportCheck).then(()
     // Safari will call onload eagerly on head injection, but we don't want the Wechat
     // path to trigger before setting srcdoc, therefore we track the timing
     let readyForOnload = false, onloadCalledWhileNotReady = false;
+    /**
+     * @returns {void}
+     */
     function doOnload () {
       if (!readyForOnload) {
         onloadCalledWhileNotReady = true;
@@ -79,8 +85,9 @@ export let featureDetectionPromise = Promise.resolve(dynamicImportCheck).then(()
     readyForOnload = true;
     if ('srcdoc' in iframe)
       iframe.srcdoc = importMapTest;
-    else
-      iframe.contentDocument.write(importMapTest);
+    else {
+      /** @type {HTMLIFrameElement} */ (iframe).contentDocument.write(importMapTest);
+    }
     // retrigger onload for Safari only if necessary
     if (onloadCalledWhileNotReady) doOnload();
   });

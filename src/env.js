@@ -3,11 +3,14 @@ export const hasDocument = typeof document !== 'undefined';
 
 export const noop = () => {};
 
+/** @type {HTMLScriptElement | undefined} */
 const optionsScript = hasDocument ? document.querySelector('script[type=esms-options]') : undefined;
 
+/** @type {ESMSInitOptions} */
 export const esmsInitOptions = optionsScript ? JSON.parse(optionsScript.innerHTML) : {};
 Object.assign(esmsInitOptions, self.esmsInitOptions || {});
 
+/** @type {boolean} */
 export let shimMode = hasDocument ? !!esmsInitOptions.shimMode : true;
 
 export const importHook = globalHook(shimMode && esmsInitOptions.onimport);
@@ -17,8 +20,10 @@ export const metaHook = esmsInitOptions.meta ? globalHook(shimMode && esmsInitOp
 
 export const mapOverrides = esmsInitOptions.mapOverrides;
 
+/** @type {string} */
 export let nonce = esmsInitOptions.nonce;
 if (!nonce && hasDocument) {
+  /** @type {HTMLScriptElement} */
   const nonceElement = document.querySelector('script[nonce]');
   if (nonceElement)
     nonce = nonceElement.nonce || nonceElement.getAttribute('nonce');
@@ -28,6 +33,11 @@ export const onerror = globalHook(esmsInitOptions.onerror || noop);
 
 export const { revokeBlobURLs, noLoadEventRetriggers, globalLoadEventRetrigger, enforceIntegrity } = esmsInitOptions;
 
+/**
+ * @template {(...args: any[]) => any} T
+ * @param {T | keyof typeof self} name
+ * @returns {T}
+ */
 function globalHook (name) {
   return typeof name === 'string' ? self[name] : name;
 }
@@ -42,37 +52,53 @@ export const onpolyfill = esmsInitOptions.onpolyfill ? globalHook(esmsInitOption
   console.log(`%c^^ Module error above is polyfilled and can be ignored ^^`, 'font-weight:900;color:#391');
 };
 
+/** @type {boolean} */
 export const edge = !navigator.userAgentData && !!navigator.userAgent.match(/Edge\/\d+\.\d+/);
 
+/** @type {string} */
 export const baseUrl = hasDocument
   ? document.baseURI
   : `${location.protocol}//${location.host}${location.pathname.includes('/') 
     ? location.pathname.slice(0, location.pathname.lastIndexOf('/') + 1) 
     : location.pathname}`;
 
+/**
+ * @param {BlobPart | Uint8Array} source
+ * @param {string} [type]
+ * @returns {string}
+ */
 export const createBlob = (source, type = 'text/javascript') => URL.createObjectURL(new Blob([source], { type }));
-export let { skip } = esmsInitOptions;
-if (Array.isArray(skip)) {
-  const l = skip.map(s => new URL(s, baseUrl).href);
+let { skip: skipDestructure } = esmsInitOptions;
+/** @type {((s: string) => boolean) | undefined} */
+export let skip;
+if (Array.isArray(skipDestructure)) {
+  const l = skipDestructure.map(s => new URL(s, baseUrl).href);
   skip = s => l.some(i => i[i.length - 1] === '/' && s.startsWith(i) || s === i);
 }
-else if (typeof skip === 'string') {
-  const r = new RegExp(skip);
+else if (typeof skipDestructure === 'string') {
+  const r = new RegExp(skipDestructure);
   skip = s => r.test(s);
-} else if (skip instanceof RegExp) {
-  skip = s => skip.test(s);
+} else if (skipDestructure instanceof RegExp) {
+  skip = s => /** @type {RegExp} */ (skipDestructure).test(s);
 }
 
-const dispatchError = error => self.dispatchEvent(Object.assign(new Event('error'), { error }));
+const dispatchError = (/** @type {any} */ error) => self.dispatchEvent(Object.assign(new Event('error'), { error }));
 
-export const throwError = err => { (self.reportError || dispatchError)(err), void onerror(err) };
+export const throwError = (/** @type {unknown} */ err) => { (self.reportError || dispatchError)(err), void onerror(err) };
 
+/**
+ * @param {string | null} parent
+ * @returns {string}
+ */
 export function fromParent (parent) {
   return parent ? ` imported from ${parent}` : '';
 }
 
 export let importMapSrcOrLazy = false;
 
+/**
+ * @returns {void}
+ */
 export function setImportMapSrcOrLazy () {
   importMapSrcOrLazy = true;
 }
@@ -84,7 +110,7 @@ if (!shimMode) {
   }
   else {
     let seenScript = false;
-    for (const script of document.querySelectorAll('script[type=module],script[type=importmap]')) {
+    for (const script of /** @type {NodeListOf<HTMLScriptElement & { ep?: boolean; }>} */ (document.querySelectorAll('script[type=module],script[type=importmap]'))) {
       if (!seenScript) {
         if (script.type === 'module' && !script.ep)
           seenScript = true;
