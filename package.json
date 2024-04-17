@@ -45,8 +45,8 @@
     "test": "test"
   },
   "scripts": {
-    "build": "npm install -g chomp ; chomp build",
-    "test": "npm install -g chomp ; chomp test"
+    "build": "npx chomp build",
+    "test": "npx chomp test"
   },
   "repository": {
     "type": "git",
